@@ -1,0 +1,59 @@
+name: Windows 安装包
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build-windows-installer:
+    name: 打包 Windows 安装包
+    runs-on: windows-latest
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 安装项目依赖
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 编译检查
+        shell: pwsh
+        run: |
+          python -m compileall app.py fertilizer_ai
+
+      - name: 生成桌面程序
+        shell: pwsh
+        run: |
+          pyinstaller --clean --noconfirm build/windows/fertilizer_ai.spec
+
+      - name: 安装 Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+
+      - name: 生成安装包
+        shell: pwsh
+        env:
+          APP_VERSION: "0.1.${{ github.run_number }}"
+        run: |
+          New-Item -ItemType Directory -Force dist/installer | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" build/windows/installer.iss
+
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI精准施肥决策系统-Windows安装包
+          path: dist/installer/*.exe
+          if-no-files-found: error
